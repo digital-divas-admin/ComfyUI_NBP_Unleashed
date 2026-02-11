@@ -30,11 +30,25 @@ RESOLUTIONS = ["1K", "2K", "4K"]
 SAFETY_TOLERANCE_OPTIONS = ["1", "2", "3", "4", "5", "6"]
 
 
-def _submit_request(endpoint, payload, timeout):
+def _resolve_api_key(fal_api_key=""):
+    """Return the API key from the node field, falling back to the env var."""
+    key = fal_api_key.strip() if fal_api_key else ""
+    if not key:
+        key = FAL_KEY
+    if not key:
+        raise ValueError(
+            "No fal.ai API key provided. Either enter it on the node "
+            "or set the FAL_KEY environment variable. "
+            "Get a key at https://fal.ai/dashboard/keys"
+        )
+    return key
+
+
+def _submit_request(endpoint, payload, timeout, api_key):
     """Submit a request to fal.ai and poll until complete."""
     url = f"https://queue.fal.run/{endpoint}"
     headers = {
-        "Authorization": f"Key {FAL_KEY}",
+        "Authorization": f"Key {api_key}",
         "Content-Type": "application/json",
     }
 
@@ -109,6 +123,7 @@ class NanoBananaProTextToImage:
                 "prompt": ("STRING", {"multiline": True}),
             },
             "optional": {
+                "fal_api_key": ("STRING", {"default": "", "multiline": False}),
                 "num_images": ("INT", {"default": 1, "min": 1, "max": 4}),
                 "aspect_ratio": (ASPECT_RATIOS, {"default": "1:1"}),
                 "output_format": (OUTPUT_FORMATS, {"default": "png"}),
@@ -129,6 +144,7 @@ class NanoBananaProTextToImage:
     def generate(
         self,
         prompt,
+        fal_api_key="",
         num_images=1,
         aspect_ratio="1:1",
         output_format="png",
@@ -138,11 +154,7 @@ class NanoBananaProTextToImage:
         enable_web_search=False,
         timeout=300,
     ):
-        if not FAL_KEY:
-            raise ValueError(
-                "FAL_KEY environment variable is not set. "
-                "Get a key at https://fal.ai/dashboard/keys"
-            )
+        api_key = _resolve_api_key(fal_api_key)
 
         payload = {
             "prompt": prompt,
@@ -155,7 +167,7 @@ class NanoBananaProTextToImage:
         if seed >= 0:
             payload["seed"] = seed
 
-        result = _submit_request(self.ENDPOINT, payload, timeout)
+        result = _submit_request(self.ENDPOINT, payload, timeout, api_key)
 
         images_data = result.get("images", [])
         description = result.get("description", "")
@@ -191,6 +203,7 @@ class NanoBananaProImageEdit:
                 "prompt": ("STRING", {"multiline": True}),
             },
             "optional": {
+                "fal_api_key": ("STRING", {"default": "", "multiline": False}),
                 "image_2": ("IMAGE",),
                 "image_3": ("IMAGE",),
                 "num_images": ("INT", {"default": 1, "min": 1, "max": 4}),
@@ -215,6 +228,7 @@ class NanoBananaProImageEdit:
         self,
         image,
         prompt,
+        fal_api_key="",
         image_2=None,
         image_3=None,
         num_images=1,
@@ -227,11 +241,7 @@ class NanoBananaProImageEdit:
         safety_tolerance="4",
         timeout=300,
     ):
-        if not FAL_KEY:
-            raise ValueError(
-                "FAL_KEY environment variable is not set. "
-                "Get a key at https://fal.ai/dashboard/keys"
-            )
+        api_key = _resolve_api_key(fal_api_key)
 
         # Convert primary image to data URI
         pil_img = _tensor_to_pil(image)
@@ -259,7 +269,7 @@ class NanoBananaProImageEdit:
             pil_3 = _tensor_to_pil(image_3)
             payload["image_3_url"] = _pil_to_data_uri(pil_3, output_format)
 
-        result = _submit_request(self.ENDPOINT, payload, timeout)
+        result = _submit_request(self.ENDPOINT, payload, timeout, api_key)
 
         images_data = result.get("images", [])
         description = result.get("description", "")
