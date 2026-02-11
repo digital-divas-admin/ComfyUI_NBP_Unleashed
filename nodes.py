@@ -27,7 +27,6 @@ OUTPUT_FORMATS = ["png", "jpeg", "webp"]
 
 RESOLUTIONS = ["1K", "2K", "4K"]
 
-SAFETY_TOLERANCE_OPTIONS = ["1", "2", "3", "4", "5", "6"]
 
 
 def _resolve_api_key(fal_api_key=""):
@@ -213,7 +212,7 @@ class NanoBananaProImageEdit:
                 "seed": ("INT", {"default": -1, "min": -1, "max": 2**31 - 1}),
                 "limit_generations": ("BOOLEAN", {"default": False}),
                 "enable_web_search": ("BOOLEAN", {"default": False}),
-                "safety_tolerance": (SAFETY_TOLERANCE_OPTIONS, {"default": "4"}),
+                "safety_tolerance": ("INT", {"default": 4, "min": 1, "max": 6}),
                 "timeout": ("INT", {"default": 300, "min": 30, "max": 600}),
             },
         }
@@ -238,7 +237,7 @@ class NanoBananaProImageEdit:
         seed=-1,
         limit_generations=False,
         enable_web_search=False,
-        safety_tolerance="4",
+        safety_tolerance=4,
         timeout=300,
     ):
         api_key = _resolve_api_key(fal_api_key)
@@ -255,7 +254,7 @@ class NanoBananaProImageEdit:
             "output_format": output_format,
             "resolution": resolution,
             "enable_web_search": enable_web_search,
-            "safety_tolerance": int(safety_tolerance),
+            "safety_tolerance": safety_tolerance,
         }
         if seed >= 0:
             payload["seed"] = seed
