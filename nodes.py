@@ -59,8 +59,14 @@ def _submit_request(endpoint, payload, timeout, api_key):
     if not request_id:
         raise RuntimeError(f"No request_id in queue response: {queue_data}")
 
-    status_url = f"https://queue.fal.run/{endpoint}/requests/{request_id}/status"
-    result_url = f"https://queue.fal.run/{endpoint}/requests/{request_id}"
+    # fal.ai app ID is "owner/name" (first two segments); any extra segments
+    # (e.g. /edit) are routes within the app and must NOT appear in the
+    # status / result polling URLs.
+    parts = endpoint.split("/", 2)
+    app_id = f"{parts[0]}/{parts[1]}"
+
+    status_url = f"https://queue.fal.run/{app_id}/requests/{request_id}/status"
+    result_url = f"https://queue.fal.run/{app_id}/requests/{request_id}"
 
     deadline = time.time() + timeout
     while time.time() < deadline:
