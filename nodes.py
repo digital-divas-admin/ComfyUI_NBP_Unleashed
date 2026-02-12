@@ -57,6 +57,8 @@ def _submit_request(endpoint, payload, timeout, api_key):
             f"fal.ai submit failed ({resp.status_code}): {resp.text}"
         )
     queue_data = resp.json()
+    print(f"[NBP] Queue response keys: {list(queue_data.keys())}")
+    print(f"[NBP] Queue response: {queue_data}")
 
     request_id = queue_data.get("request_id")
     if not request_id:
@@ -71,13 +73,19 @@ def _submit_request(endpoint, payload, timeout, api_key):
         "response_url",
         f"https://queue.fal.run/{endpoint}/requests/{request_id}",
     )
+    print(f"[NBP] status_url: {status_url}")
+    print(f"[NBP] result_url: {result_url}")
 
     deadline = time.time() + timeout
+    poll_count = 0
     while time.time() < deadline:
         status_resp = requests.get(status_url, headers=headers, timeout=30)
         status_resp.raise_for_status()
         status_data = status_resp.json()
         status = status_data.get("status")
+        poll_count += 1
+        if poll_count <= 5 or poll_count % 15 == 0:
+            print(f"[NBP] Poll #{poll_count}: {status_data}")
 
         if status == "COMPLETED":
             result_resp = requests.get(result_url, headers=headers, timeout=30)
