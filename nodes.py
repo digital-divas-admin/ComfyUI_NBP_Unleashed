@@ -52,7 +52,10 @@ def _submit_request(endpoint, payload, timeout, api_key):
     }
 
     resp = requests.post(url, headers=headers, json=payload, timeout=30)
-    resp.raise_for_status()
+    if not resp.ok:
+        raise RuntimeError(
+            f"fal.ai submit failed ({resp.status_code}): {resp.text}"
+        )
     queue_data = resp.json()
 
     request_id = queue_data.get("request_id")
@@ -77,7 +80,11 @@ def _submit_request(endpoint, payload, timeout, api_key):
 
         if status == "COMPLETED":
             result_resp = requests.get(result_url, headers=headers, timeout=30)
-            result_resp.raise_for_status()
+            if not result_resp.ok:
+                raise RuntimeError(
+                    f"fal.ai result fetch failed ({result_resp.status_code}): "
+                    f"{result_resp.text}"
+                )
             return result_resp.json()
         elif status in ("FAILED", "CANCELLED"):
             raise RuntimeError(
