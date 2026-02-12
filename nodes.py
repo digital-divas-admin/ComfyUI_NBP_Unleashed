@@ -46,56 +46,34 @@ def _resolve_api_key(fal_api_key=""):
 
 def _submit_request(endpoint, payload, timeout, api_key):
     """Submit a request to fal.ai and poll until complete."""
-    url = f"https://queue.fal.run/{endpoint}"
     headers = {
         "Authorization": f"Key {api_key}",
         "Content-Type": "application/json",
     }
 
-    resp = requests.post(url, headers=headers, json=payload, timeout=30)
+    # Log the payload (without image data) for diagnostics
+    debug_payload = {k: (v if k != "image_urls" else f"[{len(v)} url(s)]")
+                     for k, v in payload.items()}
+    print(f"[NBP] Endpoint: {endpoint}")
+    print(f"[NBP] Payload: {debug_payload}")
+
+    # Try the synchronous endpoint first — simpler and avoids queue polling
+    # issues. The sync endpoint blocks until the result is ready.
+    sync_url = f"https://fal.run/{endpoint}"
+    print(f"[NBP] POST {sync_url} (timeout={timeout}s)")
+    try:
+        resp = requests.post(
+            sync_url, headers=headers, json=payload, timeout=timeout,
+        )
+    except requests.exceptions.Timeout:
+        raise TimeoutError(f"fal.ai request timed out after {timeout}s")
+
+    print(f"[NBP] Response: {resp.status_code}")
     if not resp.ok:
         raise RuntimeError(
-            f"fal.ai submit failed ({resp.status_code}): {resp.text}"
+            f"fal.ai request failed ({resp.status_code}): {resp.text}"
         )
-    queue_data = resp.json()
-
-    request_id = queue_data.get("request_id")
-    if not request_id:
-        raise RuntimeError(f"No request_id in queue response: {queue_data}")
-
-    # Use the URLs returned by fal.ai (they include the correct app path).
-    status_url = queue_data.get(
-        "status_url",
-        f"https://queue.fal.run/{endpoint}/requests/{request_id}/status",
-    )
-    result_url = queue_data.get(
-        "response_url",
-        f"https://queue.fal.run/{endpoint}/requests/{request_id}",
-    )
-
-    deadline = time.time() + timeout
-    while time.time() < deadline:
-        status_resp = requests.get(status_url, headers=headers, timeout=30)
-        status_resp.raise_for_status()
-        status_data = status_resp.json()
-        status = status_data.get("status")
-
-        if status == "COMPLETED":
-            result_resp = requests.get(result_url, headers=headers, timeout=30)
-            if not result_resp.ok:
-                raise RuntimeError(
-                    f"fal.ai result fetch failed ({result_resp.status_code}): "
-                    f"{result_resp.text}"
-                )
-            return result_resp.json()
-        elif status in ("FAILED", "CANCELLED"):
-            raise RuntimeError(
-                f"fal.ai request {status}: {status_data}"
-            )
-
-        time.sleep(2)
-
-    raise TimeoutError(f"fal.ai request timed out after {timeout}s")
+    return resp.json()
 
 
 def _download_image_as_tensor(url):
