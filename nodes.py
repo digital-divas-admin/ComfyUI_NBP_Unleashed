@@ -57,8 +57,6 @@ def _submit_request(endpoint, payload, timeout, api_key):
             f"fal.ai submit failed ({resp.status_code}): {resp.text}"
         )
     queue_data = resp.json()
-    print(f"[NBP] Queue response keys: {list(queue_data.keys())}")
-    print(f"[NBP] Queue response: {queue_data}")
 
     request_id = queue_data.get("request_id")
     if not request_id:
@@ -73,19 +71,13 @@ def _submit_request(endpoint, payload, timeout, api_key):
         "response_url",
         f"https://queue.fal.run/{endpoint}/requests/{request_id}",
     )
-    print(f"[NBP] status_url: {status_url}")
-    print(f"[NBP] result_url: {result_url}")
 
     deadline = time.time() + timeout
-    poll_count = 0
     while time.time() < deadline:
         status_resp = requests.get(status_url, headers=headers, timeout=30)
         status_resp.raise_for_status()
         status_data = status_resp.json()
         status = status_data.get("status")
-        poll_count += 1
-        if poll_count <= 5 or poll_count % 15 == 0:
-            print(f"[NBP] Poll #{poll_count}: {status_data}")
 
         if status == "COMPLETED":
             result_resp = requests.get(result_url, headers=headers, timeout=30)
@@ -130,6 +122,31 @@ def _pil_to_data_uri(img, fmt="png"):
     encoded = base64.b64encode(buf.getvalue()).decode("ascii")
     mime = f"image/{fmt}" if fmt != "jpeg" else "image/jpeg"
     return f"data:{mime};base64,{encoded}"
+
+
+def _upload_to_fal(img, fmt, api_key):
+    """Upload a PIL image to fal.ai CDN and return the access URL."""
+    buf = io.BytesIO()
+    img.save(buf, format=fmt.upper() if fmt != "jpeg" else "JPEG")
+    mime = f"image/{fmt}" if fmt != "jpeg" else "image/jpeg"
+    resp = requests.post(
+        "https://fal.media/files/upload",
+        headers={
+            "Authorization": f"Bearer {api_key}",
+            "Content-Type": mime,
+            "X-Fal-File-Name": f"input.{fmt}",
+        },
+        data=buf.getvalue(),
+        timeout=60,
+    )
+    if not resp.ok:
+        raise RuntimeError(
+            f"fal.ai image upload failed ({resp.status_code}): {resp.text}"
+        )
+    url = resp.json().get("access_url")
+    if not url:
+        raise RuntimeError(f"No access_url in upload response: {resp.json()}")
+    return url
 
 
 class NanoBananaProTextToImage:
@@ -264,12 +281,12 @@ class NanoBananaProImageEdit:
     ):
         api_key = _resolve_api_key(fal_api_key)
 
-        # Build image_urls array (primary + optional reference images)
-        image_urls = [_pil_to_data_uri(_tensor_to_pil(image), output_format)]
+        # Upload images to fal.ai CDN and build image_urls array
+        image_urls = [_upload_to_fal(_tensor_to_pil(image), output_format, api_key)]
         if image_2 is not None:
-            image_urls.append(_pil_to_data_uri(_tensor_to_pil(image_2), output_format))
+            image_urls.append(_upload_to_fal(_tensor_to_pil(image_2), output_format, api_key))
         if image_3 is not None:
-            image_urls.append(_pil_to_data_uri(_tensor_to_pil(image_3), output_format))
+            image_urls.append(_upload_to_fal(_tensor_to_pil(image_3), output_format, api_key))
 
         payload = {
             "prompt": prompt,
