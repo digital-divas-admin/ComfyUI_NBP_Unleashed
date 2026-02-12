@@ -255,13 +255,16 @@ class NanoBananaProImageEdit:
     ):
         api_key = _resolve_api_key(fal_api_key)
 
-        # Convert primary image to data URI
-        pil_img = _tensor_to_pil(image)
-        image_url = _pil_to_data_uri(pil_img, output_format)
+        # Build image_urls array (primary + optional reference images)
+        image_urls = [_pil_to_data_uri(_tensor_to_pil(image), output_format)]
+        if image_2 is not None:
+            image_urls.append(_pil_to_data_uri(_tensor_to_pil(image_2), output_format))
+        if image_3 is not None:
+            image_urls.append(_pil_to_data_uri(_tensor_to_pil(image_3), output_format))
 
         payload = {
             "prompt": prompt,
-            "image_url": image_url,
+            "image_urls": image_urls,
             "num_images": 1 if limit_generations else num_images,
             "aspect_ratio": aspect_ratio,
             "output_format": output_format,
@@ -271,15 +274,6 @@ class NanoBananaProImageEdit:
         }
         if seed >= 0:
             payload["seed"] = seed
-
-        # Add optional reference images
-        if image_2 is not None:
-            pil_2 = _tensor_to_pil(image_2)
-            payload["image_2_url"] = _pil_to_data_uri(pil_2, output_format)
-
-        if image_3 is not None:
-            pil_3 = _tensor_to_pil(image_3)
-            payload["image_3_url"] = _pil_to_data_uri(pil_3, output_format)
 
         result = _submit_request(self.ENDPOINT, payload, timeout, api_key)
 
