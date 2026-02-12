@@ -11,16 +11,17 @@ from PIL import Image
 FAL_KEY = os.environ.get("FAL_KEY", "")
 
 ASPECT_RATIOS = [
+    "auto",
     "1:1",
     "16:9",
     "9:16",
     "4:3",
     "3:4",
+    "4:5",
+    "5:4",
     "21:9",
-    "9:21",
     "3:2",
     "2:3",
-    "5:4",
 ]
 
 OUTPUT_FORMATS = ["png", "jpeg", "webp"]
@@ -245,7 +246,7 @@ class NanoBananaProImageEdit:
                 "image_2": ("IMAGE",),
                 "image_3": ("IMAGE",),
                 "num_images": ("INT", {"default": 1, "min": 1, "max": 4}),
-                "aspect_ratio": (ASPECT_RATIOS, {"default": "1:1"}),
+                "aspect_ratio": (ASPECT_RATIOS, {"default": "auto"}),
                 "output_format": (OUTPUT_FORMATS, {"default": "png"}),
                 "resolution": (RESOLUTIONS, {"default": "1K"}),
                 "seed": ("INT", {"default": -1, "min": -1, "max": 2**31 - 1}),
@@ -270,7 +271,7 @@ class NanoBananaProImageEdit:
         image_2=None,
         image_3=None,
         num_images=1,
-        aspect_ratio="1:1",
+        aspect_ratio="auto",
         output_format="png",
         resolution="1K",
         seed=-1,
@@ -296,7 +297,7 @@ class NanoBananaProImageEdit:
             "output_format": output_format,
             "resolution": resolution,
             "enable_web_search": enable_web_search,
-            "safety_tolerance": safety_tolerance,
+            "safety_tolerance": str(safety_tolerance),
         }
         if seed >= 0:
             payload["seed"] = seed
